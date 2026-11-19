@@ -34,30 +34,18 @@ For Android Studio, edit the local `tmdb.properties` file. This file contains bl
 
 The app uses HTTPS network access. An internet connection and working TMDb credentials are required for live catalogue data.
 
-## Build APK with GitHub Actions (without Android Studio)
+## Build an APK using your existing GitHub repository
 
-1. Create a **new private repository** named `CinemaTV` in your own GitHub account.
-2. Upload **the contents of this folder**, including `.github/workflows/android-apk.yml`. Make sure the `.github` folder is included.
-3. Commit files to the default `main` branch.
-4. Open **Actions → Build Cinema TV APK**, then click **Run workflow** (or let the push trigger it automatically).
-5. When successful, open that run → **Artifacts** → **CinemaTV-debug-apk**. Download and extract it to get `app-debug.apk`.
-6. Install the APK on your Android phone. If Android asks, allow installation from your file manager/browser for this app only.
+Repository: `https://github.com/adamhull27041994-del/Android-TV`
 
-The workflow uses GitHub-hosted Gradle 8.13; no `gradlew` script or wrapper JAR is required on GitHub Actions. The resulting `debug` APK is suitable for personal testing, **not for publishing on Google Play**.
+1. Go to **Settings → Secrets and variables → Actions** and add `TMDB_BEARER` and `TMDB_API_KEY` to the repository. Do **not** put their values in a public commit.
+2. Open **Actions → Build Cinema TV APK** and click **Run workflow**. The initial upload to the `main` branch also triggers the workflow.
+3. After a successful run, open **Artifacts → CinemaTV-debug-apk** and download `app-debug.apk`.
+4. Install it on Android 9 or later.
 
-### GitHub CLI shortcut
+The workflow uses GitHub-hosted Gradle 8.13; the Gradle wrapper JAR is not required in GitHub Actions. The resulting debug APK is for personal testing, not Google Play release distribution.
 
-If you have GitHub CLI (`gh`) installed and authenticated, run the following from the root of the extracted project:
-
-```bash
-git init
-git add .
-git commit -m "Initial Cinema TV native Android app"
-git branch -M main
-gh repo create CinemaTV --private --source=. --remote=origin --push
-```
-
-If `gh` is not available, create the private repo in GitHub's web UI and upload these files, or use GitHub Desktop.
+**Visibility warning:** At the time this source was uploaded, the repository was **public**. Change visibility to Private in GitHub Settings before providing or distributing builds containing private tokens. Even in a private repository, keys compiled into an APK can be extracted by someone with that APK.
 
 ## How to play your authorised video URLs
 
