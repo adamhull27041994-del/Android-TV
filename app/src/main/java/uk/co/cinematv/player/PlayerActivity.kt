@@ -1,6 +1,6 @@
 package uk.co.cinematv.player
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import uk.co.cinematv.data.LibraryStore
 import uk.co.cinematv.model.*
 
-class PlayerActivity : Activity() {
+class PlayerActivity : ComponentActivity() {
     private var player: ExoPlayer? = null
     private var details: StreamKey? = null
     private var previousSaveElapsed = 0L
