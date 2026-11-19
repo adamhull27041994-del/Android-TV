@@ -17,13 +17,9 @@ An installable Kotlin/Jetpack Compose Android application for Android 9+ (`minSd
 
 **Limitations:** Film/TV titles listed from TMDb are metadata, not video content. The included provider returns **only links the user has explicitly added** to a specific film or TV episode. No third-party unverified Cinema HQ scraping providers are connected. TMDb watch-provider data are external viewing options and are not playable video links. DRM-protected subscription playback is not implemented.
 
-## TMDb credentials (safe for a public repository)
+## TMDb credentials (temporary prototype configuration)
 
-**This repository currently has public visibility**, so private credentials are not committed.
-
-For GitHub Actions, open **Settings → Secrets and variables → Actions → New repository secret** and create `TMDB_BEARER` (TMDb API Read Access Token) and `TMDB_API_KEY` (TMDb v3 key). The workflow loads them into `tmdb.properties` only on its runner.
-
-For Android Studio, edit the local `tmdb.properties` file. This file contains blank placeholders in the public repository. Keep your local real values private; do not commit them. Note that the APK embeds whichever keys it was built with, so they can be extracted from the app by an advanced user.
+At the owner's request, the TMDb API Read Access Token and v3 API key are committed in `tmdb.properties` so both GitHub Actions and Android Studio builds work without adding secrets. **This repository is currently public; the credentials are publicly exposed and can be recovered from both Git history and installed APKs.** Rotate the credentials and move them to secured configuration before sharing or publishing the application.
 
 ## Run in Android Studio
 
@@ -38,14 +34,13 @@ The app uses HTTPS network access. An internet connection and working TMDb crede
 
 Repository: `https://github.com/adamhull27041994-del/Android-TV`
 
-1. Go to **Settings → Secrets and variables → Actions** and add `TMDB_BEARER` and `TMDB_API_KEY` to the repository. Do **not** put their values in a public commit.
-2. Open **Actions → Build Cinema TV APK** and click **Run workflow**. The initial upload to the `main` branch also triggers the workflow.
-3. After a successful run, open **Artifacts → CinemaTV-debug-apk** and download `app-debug.apk`.
-4. Install it on Android 9 or later.
+1. Open **Actions → Build Cinema TV APK**. A push to `main` triggers the workflow automatically; use **Run workflow** to rebuild manually.
+2. After a successful run, open **Artifacts → CinemaTV-debug-apk** and download `app-debug.apk`.
+3. Install it on Android 9 or later. The TMDb credentials are already in `tmdb.properties`.
 
 The workflow uses GitHub-hosted Gradle 8.13; the Gradle wrapper JAR is not required in GitHub Actions. The resulting debug APK is for personal testing, not Google Play release distribution.
 
-**Visibility warning:** At the time this source was uploaded, the repository was **public**. Change visibility to Private in GitHub Settings before providing or distributing builds containing private tokens. Even in a private repository, keys compiled into an APK can be extracted by someone with that APK.
+**Visibility warning:** The repository is **public** and the TMDb credentials are now in its commit history. Changing the repository to Private does not erase copies or protect tokens already embedded in shared APKs. Rotate them before distribution.
 
 ## How to play your authorised video URLs
 
