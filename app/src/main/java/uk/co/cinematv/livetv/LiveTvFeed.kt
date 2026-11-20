@@ -21,7 +21,8 @@ data class LiveChannel(
     val group: String,
     val url: String,
     val logo: String? = null,
-    val headers: Map<String, String> = emptyMap()
+    val headers: Map<String, String> = emptyMap(),
+    val source: String = "Custom playlist"
 )
 
 object LiveTvFeed {
