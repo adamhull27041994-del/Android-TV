@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
  * Additional adapters reconstructed from request constants in the original APK.
  * Providers are independent of Cinema TV. Availability and playback are unverified.
  */
-private object ProviderNetwork {
+internal object ProviderNetwork {
     val client = OkHttpClient.Builder()
         .connectTimeout(7, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
@@ -37,7 +37,7 @@ private object ProviderNetwork {
 }
 
 /** Accept direct HTTPS media candidates; skip third-party embeds and magnet links. */
-private object LinkExtractor {
+internal object LinkExtractor {
     private data class Candidate(
         val url: String,
         val title: String,

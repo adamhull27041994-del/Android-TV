@@ -120,6 +120,8 @@ private fun CinemaApp(vm: CinemaViewModel) {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(voeUrl))) }
                     .onFailure { android.widget.Toast.makeText(context, "No browser available for VOE", android.widget.Toast.LENGTH_LONG).show() }
             }
+            stream.provider == "RiveStream web player" ->
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(stream.url)))
             stream.mimeType == "text/html" -> WebPlayerActivity.launch(context, stream.url)
             else -> PlayerActivity.launch(context, stream, key)
         }

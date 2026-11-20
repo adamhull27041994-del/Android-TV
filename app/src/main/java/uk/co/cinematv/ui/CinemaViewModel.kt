@@ -15,6 +15,7 @@ import uk.co.cinematv.data.LibraryStore
 import uk.co.cinematv.data.TmdbApi
 import uk.co.cinematv.model.*
 import uk.co.cinematv.provider.PersonalStreamProvider
+import uk.co.cinematv.provider.*
 import uk.co.cinematv.provider.ProviderRegistry
 import uk.co.cinematv.provider.ProviderReport
 import uk.co.cinematv.provider.WatchOutProvider
@@ -27,7 +28,14 @@ import uk.co.cinematv.provider.TwoEmbedWebProvider
 class CinemaViewModel(app: Application) : AndroidViewModel(app) {
     private val api = TmdbApi()
     private val store = LibraryStore(app)
-    private val providerRegistry = ProviderRegistry(listOf(PersonalStreamProvider(store), WatchOutProvider(), YaStreamProvider(), VidBoltProvider(), ThugTvProvider(), VidLinkEmbedProvider(), TwoEmbedWebProvider()))
+    private val providerRegistry = ProviderRegistry(listOf(
+        PersonalStreamProvider(store), WatchOutProvider(), YaStreamProvider(),
+        VidBoltProvider(), ThugTvProvider(), MovieBoxProvider(), FrameXtvProvider(),
+        VidLinkApiProvider(), VuflixProvider(),
+        StremioTorrentProvider("Torrentio","https://torrentio.strem.fun/sort=seeders/stream"),
+        StremioTorrentProvider("TorrentClaw","https://torrentclaw.com/api/stremio/stream"),
+        VidLinkEmbedProvider(), TwoEmbedWebProvider(), RiveStreamWebProvider()
+    ))
 
     var tab by mutableStateOf(0)
     var homeLoading by mutableStateOf(true)
