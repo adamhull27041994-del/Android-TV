@@ -31,6 +31,7 @@ class CinemaViewModel(app: Application) : AndroidViewModel(app) {
     private val providerRegistry = ProviderRegistry(listOf(
         PersonalStreamProvider(store), WatchOutProvider(), YaStreamProvider(),
         VidBoltProvider(), ThugTvProvider(), MovieBoxProvider(), FrameXtvProvider(),
+        PurStreamProvider(), LMScriptProvider(), VidQueenProvider(), VixSrcProvider(),
         VidLinkApiProvider(), VuflixProvider(),
         StremioTorrentProvider("Torrentio","https://torrentio.strem.fun/sort=seeders/stream"),
         StremioTorrentProvider("TorrentClaw","https://torrentclaw.com/api/stremio/stream"),
