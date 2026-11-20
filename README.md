@@ -82,3 +82,11 @@ Useful future providers: personal Jellyfin/Plex libraries with authorised API ac
 ## Legal, data, and provider notices
 
 This product uses the TMDb API but is not endorsed or certified by TMDb. TMDb data and imagery remain subject to its usage terms; watch-provider metadata in TMDb is provided through JustWatch. The demo video link is supplied solely to test the player. Use your own lawfully accessible sources; do not assume a public provider domain grants redistribution or streaming rights.
+
+## Automatic sources in this revision
+
+- **WatchOut**: For TV, fetches `https://raw.githubusercontent.com/Watchout2025/api/refs/heads/main/hls/tv/{tmdbId}/S{season}.json`; retrieves the selected episode number from the JSON map. For movies, reads the text link at `hls/movie/{tmdbId}`. Treats `404` as no match and forces HLS MIME for playlist URLs with a `.txt` suffix. The native Media3 player handles actual direct links.
+- **VidLink**: Uses the provider's documented `/tv/{tmdbId}/{season}/{episode}` and `/movie/{tmdbId}` HTML embeds in a separate WebView. This is NOT an extracted, native Media3 stream, and its availability is unknown until opened.
+- **Personal sources**: Explicitly added streams remain available and deletable as before.
+
+Provider endpoints can break or change without warning. These providers are independent of this project and do not certify any licensing or right to view content. The original APK contains many other providers whose request protocols or responses have not yet been implemented.

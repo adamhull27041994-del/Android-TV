@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import uk.co.cinematv.model.*
 import uk.co.cinematv.player.PlayerActivity
+import uk.co.cinematv.player.WebPlayerActivity
 import uk.co.cinematv.ui.CinemaViewModel
 
 private val Background = Color(0xFF101014)
@@ -110,7 +111,10 @@ private fun CinemaApp(vm: CinemaViewModel) {
             }
         }
     }
-    SourceDialogs(vm, onPlay = { stream, key -> PlayerActivity.launch(context, stream, key) })
+    SourceDialogs(vm, onPlay = { stream, key ->
+        if (stream.mimeType == "text/html") WebPlayerActivity.launch(context, stream.url)
+        else PlayerActivity.launch(context, stream, key)
+    })
 }
 
 @Composable
@@ -386,8 +390,8 @@ private fun SettingsScreen() {
             Card(colors = CardDefaults.cardColors(containerColor = Surface)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Streaming sources", fontWeight = FontWeight.Bold)
-                    Text("Open a title or episode, select streaming sources, and add an HTTPS HLS (.m3u8), DASH (.mpd) or MP4 link for content you are authorised to access.", color = Secondary, fontSize = 13.sp)
-                    Text("Source URLs are stored locally on this device. Custom DRM, login cookies and protected subscription streams are not supported.", color = Secondary, fontSize = 12.sp)
+                    Text("Episode source lookup searches WatchOut season files for direct HLS links and offers a separate VidLink web player fallback. You can also add your own HTTPS streams.", color = Secondary, fontSize = 13.sp)
+                    Text("External sources are unaffiliated and may be unavailable, unreliable or not licensed for your use. Only watch material you have permission to access. Personal sources remain on your device.", color = Secondary, fontSize = 12.sp)
                 }
             }
         }
@@ -409,20 +413,25 @@ private fun SourceDialogs(vm: CinemaViewModel, onPlay: (PlayableStream, StreamKe
             Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(heading, fontWeight = FontWeight.Bold)
                 if (vm.sourcesLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                if (vm.sourceResults.isEmpty() && !vm.sourcesLoading) Text("No playable source has been configured for this title or episode.", color = Secondary, fontSize = 13.sp)
+                if (vm.sourceResults.isEmpty() && !vm.sourcesLoading) Text("No direct stream found for this title or episode. The web player may still be able to find one.", color = Secondary, fontSize = 13.sp)
                 vm.sourceResults.forEach { stream ->
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF272732))) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(stream.title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                Text(stream.provider, fontSize = 11.sp, color = Secondary)
+                                Text(stream.provider + if (stream.mimeType == "text/html") " · Web embed" else " · Direct stream", fontSize = 11.sp, color = Secondary)
                             }
                             IconButton(onClick = { onPlay(stream, key) }) { Icon(Icons.Default.PlayArrow, "Play", tint = Crimson) }
-                            IconButton(onClick = { vm.deleteSource(stream.id) }) { Icon(Icons.Default.DeleteOutline, "Remove source", tint = Secondary) }
+                            if (stream.provider == "Personal sources") {
+                                IconButton(onClick = { vm.deleteSource(stream.id) }) { Icon(Icons.Default.DeleteOutline, "Remove source", tint = Secondary) }
+                            }
                         }
                     }
                 }
                 if (vm.sourceError != null) Text(vm.sourceError!!, color = Crimson, fontSize = 12.sp)
+                TextButton(onClick = vm::loadSources, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Check sources again")
+                }
                 OutlinedButton(onClick = { vm.addSourceOpen = true }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("Add an authorised stream URL")
                 }

@@ -11,6 +11,11 @@
         android:theme="@style/Theme.CinemaTV"
         android:usesCleartextTraffic="false">
         <activity
+            android:name=".player.WebPlayerActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Theme.CinemaTV.Player" />
+        <activity
             android:name=".player.PlayerActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:exported="false"
