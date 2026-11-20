@@ -1,6 +1,11 @@
 package uk.co.cinematv.provider
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.supervisorScope
+import withTimeoutOrNull
+import CancellationException
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -112,9 +117,9 @@ class VidLinkEmbedProvider : StreamProvider {
 
 /** Concurrent resolution prevents one unavailable API from stalling the source list. */
 class ProviderRegistry(private val providers: List<StreamProvider>) {
-    suspend fun resolve(key: StreamKey): List<PlayableStream> = kotlinx.coroutines.supervisorScope {
+    suspend fun resolve(key: StreamKey): List<PlayableStream> = supervisorScope {
         providers.map { provider ->
-            kotlinx.coroutines.async(kotlinx.coroutines.Dispatchers.IO) {
+            async(Dispatchers.IO) {
                 try {
                     kotlinx.coroutines.withTimeoutOrNull(14_000L) { provider.resolve(key) }.orEmpty()
                 } catch (error: kotlinx.coroutines.CancellationException) {
@@ -124,7 +129,7 @@ class ProviderRegistry(private val providers: List<StreamProvider>) {
                 }
             }
         }.let { tasks ->
-            kotlinx.coroutines.awaitAll(*tasks.toTypedArray()).flatten()
+            tasks.awaitAll().flatten()
                 .distinctBy { it.url }
                 .sortedWith(compareBy<PlayableStream> { it.mimeType == "text/html" }.thenBy { it.provider })
         }
