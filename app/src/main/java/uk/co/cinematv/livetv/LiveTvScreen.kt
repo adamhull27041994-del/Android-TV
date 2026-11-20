@@ -59,6 +59,9 @@ fun LiveTvScreen() {
     var checking by remember { mutableStateOf(false) }
     var manualExpanded by remember { mutableStateOf(false) }
     var sourceLabel by remember { mutableStateOf("") }
+    var scraperQuery by remember { mutableStateOf("Sky Sports") }
+    var scraperLoading by remember { mutableStateOf(false) }
+    var scraperResultMessage by remember { mutableStateOf<String?>(null) }
     val streamStatus = remember {
         mutableStateMapOf<String, UkChannelDiscovery.ProbeResult>()
     }
@@ -125,6 +128,7 @@ fun LiveTvScreen() {
                     channels = result.channels
                     category = "All"
                     search = ""
+                    scraperResultMessage = null
                     sourceLabel = "Public UK lists · " + result.sourcesLoaded + "/" +
                         result.sourcesAttempted + " sources"
                     streamStatus.clear()
@@ -142,6 +146,45 @@ fun LiveTvScreen() {
                 error = e.message ?: "Unable to scan public UK channels."
             } finally {
                 autoLoading = false
+            }
+        }
+    }
+
+
+    fun scrapePlaylists(term: String) {
+        if (scraperLoading || autoLoading || loading) return
+        if (term.trim().length < 2) {
+            error = "Enter at least two characters to search."
+            return
+        }
+        scraperLoading = true
+        error = null
+        scraperResultMessage = null
+        scope.launch {
+            try {
+                val result = UkChannelDiscovery.searchPublic(term.trim())
+                channels = result.channels
+                streamStatus.clear()
+                category = "All"
+                search = ""
+                sourceLabel = "Search: " + term.trim() + " · " +
+                    result.sourcesLoaded + "/" + result.sourcesAttempted + " lists checked"
+                scraperResultMessage = if (result.channels.isEmpty()) {
+                    "No matching HTTPS channel listings found in the public sources."
+                } else {
+                    result.channels.size.toString() + " matching channel listings found. " +
+                        "These are not necessarily playable or licensed."
+                }
+                if (result.warnings.isNotEmpty()) {
+                    error = result.warnings.take(3).joinToString("; ")
+                }
+                if (result.channels.isNotEmpty()) {
+                    checkChannels(result.channels.take(10))
+                }
+            } catch (e: Exception) {
+                error = e.message ?: "Channel search failed"
+            } finally {
+                scraperLoading = false
             }
         }
     }
@@ -218,6 +261,52 @@ fun LiveTvScreen() {
                     } else if (sourceLabel.isNotBlank()) {
                         Text(sourceLabel, color = Muted, fontSize = 12.sp)
                     }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Search more channels", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(
+                        "Searches " + UkChannelDiscovery.searchFeeds.size +
+                            " public IPTV playlists for a channel name. Includes " +
+                            "international and sports listings; links may not be authorised or available.",
+                        color = Muted, fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = scraperQuery,
+                        onValueChange = { scraperQuery = it },
+                        label = { Text("Channel name (e.g. Sky Sports)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 1,
+                        singleLine = true
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            enabled = !scraperLoading && !autoLoading && !loading &&
+                                scraperQuery.trim().length >= 2,
+                            onClick = { scrapePlaylists(scraperQuery) }
+                        ) { Text("Find channels") }
+                        OutlinedButton(
+                            enabled = !scraperLoading && !autoLoading && !loading,
+                            onClick = {
+                                scraperQuery = "Sky Sports"
+                                scrapePlaylists("Sky Sports")
+                            }
+                        ) { Text("Sky Sports") }
+                    }
+                    if (scraperLoading) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = Accent)
+                        Text("Searching public playlists...", color = Muted, fontSize = 12.sp)
+                    }
+                    scraperResultMessage?.let { Text(it, color = Muted, fontSize = 12.sp) }
                 }
             }
         }
@@ -399,6 +488,8 @@ fun LiveTvScreen() {
             item {
                 Text(
                     if (autoLoading) "Searching public UK lists..."
+                    else if (scraperLoading) "Searching channel directories..."
+                    else if (scraperResultMessage != null) scraperResultMessage.orEmpty()
                     else "No channels loaded. Select Scan UK to retry, or add your own playlist.",
                     color = Muted, fontSize = 13.sp,
                     modifier = Modifier.padding(vertical = 24.dp)

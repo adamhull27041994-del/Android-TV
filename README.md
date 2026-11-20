@@ -145,3 +145,22 @@ A **Live TV** bottom-navigation tab connects to user-supplied HTTPS M3U playlist
 The JSON parser supports channel objects with the fields identified by inspection of AK47Sports v1.6: name, logo, links, category/group, visible and is_playlist, plus lists of channel objects. This is a *format reader*, not a connection to the AK47 Sports backend. That app obtains the current api_host from Firebase Remote Config, and the actual hostname, playlist data, and content-rights have **not** been established. We do not bundle the AK47 app's private configuration, access tokens or third-party sports streams.
 
 To use: Live TV → enter an authorised HTTPS feed URL → Load channels → select category/channel. Playlists or streams that need DRM, proprietary sessions or additional credentials may not play. The playlist URL may itself contain credentials, so do not share it publicly. Live TV channels are not added to movie/episode watch history.
+
+
+## Multi-source Live TV channel search (November 2026)
+
+The Live TV screen includes an Android-native Kotlin implementation inspired by the
+public GitHub project `MohamedAminGrami/IPTV-SCRAPPER`: parallel playlist collection,
+channel-name filtering, URL deduplication, and lightweight HTTP/HLS/DASH response
+checks. Select **Live TV → Search more channels** and enter a channel name such as
+`Sky Sports`, or press the **Sky Sports** shortcut. It searches eight HTTPS public
+playlist indexes: IPTV-org UK/USA/Canada/Australia/NZ/India and Free-TV UK/worldwide.
+These repository sources were checked to exist when the feature was implemented.
+
+The implementation does not run CPython, scrape arbitrary websites, scan IP ranges,
+ignore invalid TLS certificates, circumvent DRM, or attempt to obtain pay-TV
+credentials. Some entries will be dead, blocked, region-limited, or unauthorised.
+The channel listing and "manifest responds" indicator **do not establish** legal
+access or successful playback of any Sky Sports channel. Users must have permission
+to view the selected content. The separate Scan UK feature and custom M3U URL
+importer remain available.

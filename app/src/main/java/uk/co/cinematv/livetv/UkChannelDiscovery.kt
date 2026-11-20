@@ -31,6 +31,37 @@ object UkChannelDiscovery {
         )
     )
 
+    /** Public playlist URLs checked against the original scraper's source list.
+     * Some URLs listed in that project now return 404, so they are omitted.
+     * Entries here are public indexes, not guarantees of broadcasting rights.
+     */
+    val searchFeeds = publicFeeds + listOf(
+        PublicFeed(
+            "Free-TV worldwide",
+            "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
+        ),
+        PublicFeed(
+            "IPTV-org USA",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/us.m3u"
+        ),
+        PublicFeed(
+            "IPTV-org Canada",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ca.m3u"
+        ),
+        PublicFeed(
+            "IPTV-org Australia",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/au.m3u"
+        ),
+        PublicFeed(
+            "IPTV-org New Zealand",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/nz.m3u"
+        ),
+        PublicFeed(
+            "IPTV-org India",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u"
+        )
+    )
+
     data class DiscoveryResult(
         val channels: List<LiveChannel>,
         val sourcesLoaded: Int,
@@ -60,6 +91,8 @@ object UkChannelDiscovery {
     @Volatile private var cache: DiscoveryResult? = null
     @Volatile private var cacheTime: Long = 0L
     private const val CACHE_MS = 10L * 60L * 1000L
+    @Volatile private var searchCache: DiscoveryResult? = null
+    @Volatile private var searchCacheTime: Long = 0L
 
     suspend fun discover(refresh: Boolean = false): DiscoveryResult {
         val now = System.currentTimeMillis()
@@ -98,6 +131,74 @@ object UkChannelDiscovery {
         }
         return report
     }
+
+
+    /**
+     * Search channel *names* across multiple public IPTV directories, using
+     * the GitHub Python scraper's collection/deduplication/search pattern.
+     * Searching for Sky Sports can return listings, but not paid access.
+     */
+    suspend fun searchPublic(query: String, refresh: Boolean = false): DiscoveryResult {
+        require(query.trim().length >= 2) { "Enter at least two characters to search" }
+        val now = System.currentTimeMillis()
+        val cached = searchCache?.takeIf { !refresh && now - searchCacheTime < CACHE_MS }
+        val all = if (cached != null) cached else {
+            val fetched = coroutineScope {
+                searchFeeds.map { feed ->
+                    async {
+                        feed to runCatching { LiveTvFeed.load(feed.url) }
+                    }
+                }.awaitAll()
+            }
+            val combined = mutableListOf<LiveChannel>()
+            val warnings = mutableListOf<String>()
+            var successes = 0
+            fetched.forEach { (feed, result) ->
+                result.onSuccess { channels ->
+                    successes++
+                    combined.addAll(channels.map { it.copy(source = feed.name) })
+                }.onFailure { error ->
+                    warnings.add(feed.name + ": " + (error.message ?: "unavailable"))
+                }
+            }
+            val collected = DiscoveryResult(
+                combined.distinctBy { it.url + "|" + it.name.lowercase() },
+                successes,
+                searchFeeds.size,
+                warnings
+            )
+            if (collected.channels.isNotEmpty()) {
+                searchCache = collected
+                searchCacheTime = System.currentTimeMillis()
+            }
+            collected
+        }
+        return all.copy(
+            channels = all.channels.filter { matchesChannelName(it.name, query) }
+                .sortedWith(
+                    compareBy<LiveChannel> { priority(it.name) }
+                        .thenBy { it.name.lowercase() }
+                        .thenBy { it.source }
+                )
+                .take(250)
+        )
+    }
+
+    /** Match words in channel name, avoiding matches solely in hostnames or URL tokens. */
+    fun matchesChannelName(name: String, query: String): Boolean {
+        val normalizedName = name.lowercase()
+            .replace(Regex("[^a-z0-9]+"), " ").trim()
+        val terms = query.lowercase()
+            .replace(Regex("[^a-z0-9]+"), " ").trim()
+            .split(' ').filter { it.isNotBlank() }
+        if (terms.isEmpty()) return false
+        val words = normalizedName.split(' ')
+        return terms.all { token -> words.any { it == token } } ||
+            normalizedName.replace(" ", "").contains(terms.joinToString(""))
+    }
+
+    fun isSkySports(channel: LiveChannel): Boolean =
+        matchesChannelName(channel.name, "Sky Sports")
 
     /** Matching is based on the channel name, not on an unauthenticated URL. */
     fun isBbcOne(channel: LiveChannel): Boolean =
