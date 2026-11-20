@@ -44,6 +44,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import uk.co.cinematv.livetv.LivePlaybackEvidence
 import uk.co.cinematv.data.LibraryStore
 import uk.co.cinematv.model.*
 
@@ -113,6 +114,12 @@ class PlayerActivity : ComponentActivity() {
         exo.addListener(object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 errorState.value = "Playback failed (" + error.errorCodeName + "). Try another source."
+            }
+
+            override fun onRenderedFirstFrame() {
+                if (intent.getBooleanExtra("cinematv_live_stream", false)) {
+                    LivePlaybackEvidence.recordVideoFrame(this@PlayerActivity, url)
+                }
             }
         })
 
@@ -203,6 +210,7 @@ class PlayerActivity : ComponentActivity() {
         fun launch(context: Context, stream: PlayableStream, key: StreamKey? = null) {
             val intent = Intent(context, PlayerActivity::class.java).apply {
                 putExtra(EXTRA_URL, stream.url)
+                putExtra("cinematv_live_stream", stream.provider == "Live TV")
                 putExtra(EXTRA_TITLE, stream.title)
                 putExtra(EXTRA_MIME, stream.mimeType)
                 putExtra(EXTRA_HEADERS, JSONObject(stream.headers).toString())
