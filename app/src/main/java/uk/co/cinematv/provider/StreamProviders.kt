@@ -140,10 +140,9 @@ class ProviderRegistry(private val providers: List<StreamProvider>) {
         val sources = batches.flatMap { it.first }.distinctBy { it.url }
             .sortedWith(compareBy<PlayableStream> { it.mimeType == "text/html" }.thenBy { it.provider })
         val reported = batches.map { it.second }
-        val inventory = ApkProviderCatalog.names.map { name ->
+        val inventory = ApkProviderCatalog.names.mapNotNull { name ->
             val matched = reported.filter { ApkProviderCatalog.canonical(it.name) == name }
-            if (matched.isEmpty()) ProviderReport(name,"Not integrated",ApkProviderCatalog.unavailableReason(name))
-            else {
+            if (matched.isEmpty()) null else {
                 val best = matched.firstOrNull { it.status == "Links returned" }
                     ?: matched.firstOrNull { it.status == "Web option" }
                     ?: matched.firstOrNull { it.status == "No links" }

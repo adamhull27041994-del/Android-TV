@@ -417,6 +417,13 @@ private fun SettingsScreen() {
 private fun SourceDialogs(vm: CinemaViewModel, onPlay: (PlayableStream, StreamKey) -> Unit) {
     val key = vm.sourceKey ?: return
     var expanded by remember(key.key) { mutableStateOf(false) }
+    var showWebOnly by remember(key.key) { mutableStateOf(false) }
+    val directSources = vm.sourceResults.filter {
+        it.mimeType != "text/html" && VoeLinks.embedUrl(it.url) == null
+    }
+    val webSources = vm.sourceResults.filter {
+        it.mimeType == "text/html" || VoeLinks.embedUrl(it.url) != null
+    }
     val heading = if (key.season != null) "${key.media.title} · S${key.season} E${key.episode}" else key.media.title
     AlertDialog(
         onDismissRequest = { vm.sourceKey = null; vm.addSourceOpen = false },
@@ -428,13 +435,12 @@ private fun SourceDialogs(vm: CinemaViewModel, onPlay: (PlayableStream, StreamKe
                 if (vm.providerReports.isNotEmpty()) {
                     val reports = vm.providerReports
                     val connected = reports.count { it.status != "Not integrated" && it.name != "Personal sources" }
-                    val remaining = reports.count { it.status == "Not integrated" }
-                    Text("40 Cinema HQ providers: $connected configured, $remaining not integrated.",
+                                        Text("$connected provider integrations checked · ${directSources.size} direct links returned.",
                         color = Secondary, fontSize = 12.sp)
                     TextButton(onClick = { expanded = !expanded }) {
                         Icon(Icons.Default.List, null)
                         Spacer(Modifier.width(5.dp))
-                        Text(if (expanded) "Hide provider status" else "Show all 40 provider statuses")
+                        Text(if (expanded) "Hide provider status" else "Show integrated provider status")
                     }
                     if (expanded) reports.forEach { report ->
                         Text(report.name + " — " + report.status,
@@ -444,8 +450,18 @@ private fun SourceDialogs(vm: CinemaViewModel, onPlay: (PlayableStream, StreamKe
                         HorizontalDivider(color = Color(0xFF383842))
                     }
                 }
-                if (vm.sourceResults.isEmpty() && !vm.sourcesLoading) Text("No direct stream found for this title or episode. The web player may still be able to find one.", color = Secondary, fontSize = 13.sp)
-                vm.sourceResults.forEach { stream ->
+                if (directSources.isEmpty() && !vm.sourcesLoading) Text(
+                    "No direct video link found. Web-only sources cannot use the Cinema TV native player.",
+                    color = Secondary, fontSize = 13.sp
+                )
+                if (webSources.isNotEmpty()) {
+                    TextButton(onClick = { showWebOnly = !showWebOnly }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Language, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (showWebOnly) "Hide web-only sources" else "Show ${webSources.size} web-only sources")
+                    }
+                }
+                (directSources + if (showWebOnly) webSources else emptyList()).forEach { stream ->
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF272732))) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
