@@ -203,6 +203,7 @@ class PlayerActivity : ComponentActivity() {
         fun launch(context: Context, stream: PlayableStream, key: StreamKey? = null) {
             val intent = Intent(context, PlayerActivity::class.java).apply {
                 putExtra(EXTRA_URL, stream.url)
+                putExtra(EXTRA_TITLE, stream.title)
                 putExtra(EXTRA_MIME, stream.mimeType)
                 putExtra(EXTRA_HEADERS, JSONObject(stream.headers).toString())
                 if (key != null) {

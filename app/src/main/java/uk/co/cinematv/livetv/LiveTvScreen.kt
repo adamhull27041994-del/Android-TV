@@ -148,7 +148,7 @@ fun LiveTvScreen() {
         if (channels.isNotEmpty()) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("\${channels.size} channels", fontWeight = FontWeight.Bold,
+                    Text("${channels.size} channels", fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f))
                     Text("Loaded", color = Muted, fontSize = 12.sp)
                 }

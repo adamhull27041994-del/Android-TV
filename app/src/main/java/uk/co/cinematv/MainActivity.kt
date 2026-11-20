@@ -36,6 +36,7 @@ import uk.co.cinematv.provider.VoeLinks
 import uk.co.cinematv.player.WebPlayerActivity
 import uk.co.cinematv.ui.CinemaViewModel
 import uk.co.cinematv.ui.HistoryScreen
+import uk.co.cinematv.livetv.LiveTvScreen
 
 private val Background = Color(0xFF101014)
 private val Surface = Color(0xFF1B1B23)
@@ -79,15 +80,15 @@ private fun CinemaApp(vm: CinemaViewModel) {
                 }
                 Spacer(Modifier.weight(1f))
                 if (vm.selected == null) {
-                    IconButton(onClick = { vm.tab = 2 }) { Icon(Icons.Default.Search, "Search") }
+                    IconButton(onClick = { vm.tab = 6 }) { Icon(Icons.Default.Search, "Search") }
                 }
             }
         },
         bottomBar = {
             if (vm.selected == null) {
                 NavigationBar(containerColor = Surface) {
-                    val labels = listOf("Shows", "Movies", "Search", "My List", "History", "Settings")
-                    val icons = listOf(Icons.Default.Tv, Icons.Default.Movie, Icons.Default.Search, Icons.Default.Bookmark, Icons.Default.History, Icons.Default.Settings)
+                    val labels = listOf("Shows", "Movies", "Live TV", "My List", "History", "Settings")
+                    val icons = listOf(Icons.Default.Tv, Icons.Default.Movie, Icons.Default.LiveTv, Icons.Default.Bookmark, Icons.Default.History, Icons.Default.Settings)
                     labels.forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = vm.tab == index,
@@ -107,10 +108,11 @@ private fun CinemaApp(vm: CinemaViewModel) {
                 selected != null -> DetailsScreen(vm, selected)
                 vm.tab == 0 -> ShowHome(vm)
                 vm.tab == 1 -> MoviesHome(vm)
-                vm.tab == 2 -> SearchScreen(vm)
+                vm.tab == 2 -> LiveTvScreen()
                 vm.tab == 3 -> LibraryScreen(vm)
                 vm.tab == 4 -> HistoryScreen(vm)
-                else -> SettingsScreen()
+                vm.tab == 5 -> SettingsScreen()
+                else -> SearchScreen(vm)
             }
         }
     }

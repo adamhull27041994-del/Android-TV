@@ -136,3 +136,12 @@ VOE and RiveStream open *external apps/browsers*; Cinema TV cannot control
 the wake state of those windows, Android Auto host displays or hardware
 screen-lock policies. A persistent timeout inside native playback can be
 diagnosed with `adb logcat -s CinemaTV_Screen:D`.
+
+
+## Live TV — authorised M3U / JSON feeds
+
+A **Live TV** bottom-navigation tab connects to user-supplied HTTPS M3U playlists and JSON channel lists. Search remains accessible with the top-right search icon. IPTV channels are grouped by category with optional logos and support the existing custom Media3 player for HLS (.m3u8), DASH (.mpd), MP4 and TS, including per-channel User-Agent, Origin and Referer headers supplied by #EXTVLCOPT. A configured URL is saved locally in Android SharedPreferences; it is **not** committed to GitHub.
+
+The JSON parser supports channel objects with the fields identified by inspection of AK47Sports v1.6: name, logo, links, category/group, visible and is_playlist, plus lists of channel objects. This is a *format reader*, not a connection to the AK47 Sports backend. That app obtains the current api_host from Firebase Remote Config, and the actual hostname, playlist data, and content-rights have **not** been established. We do not bundle the AK47 app's private configuration, access tokens or third-party sports streams.
+
+To use: Live TV → enter an authorised HTTPS feed URL → Load channels → select category/channel. Playlists or streams that need DRM, proprietary sessions or additional credentials may not play. The playlist URL may itself contain credentials, so do not share it publicly. Live TV channels are not added to movie/episode watch history.
