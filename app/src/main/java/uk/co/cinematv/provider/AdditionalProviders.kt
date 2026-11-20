@@ -53,6 +53,12 @@ private object LinkExtractor {
             val url = text.trim()
             val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return
             if (uri.scheme != "https" || uri.host.isNullOrBlank() || url.contains('\n') || url.contains('\r')) return
+            // Provider JSON can contain a VOE file-host link instead of an HLS URL.
+            // Present the host's own player rather than extracting its video.
+            VoeLinks.embedUrl(url)?.let { voeEmbed ->
+                results.add(Candidate(voeEmbed, label, "text/html", emptyMap()))
+                return
+            }
             val path = uri.path.orEmpty().lowercase()
             val kind = hint.lowercase()
             if (kind.contains("embed") || path.contains("/embed/") || path.endsWith(".html")) return
@@ -95,7 +101,7 @@ private object LinkExtractor {
                         data.optString(it)
                     }
                     val nextHeaders = mergeHeaders(data, headers)
-                    listOf("url", "file", "src", "stream_url", "stream").forEach { field ->
+                    listOf("url", "file", "src", "stream_url", "stream", "embed", "embedUrl", "embed_url", "link", "player", "href").forEach { field ->
                         when (val item = data.opt(field)) {
                             is String -> consider(item, title, hint, nextHeaders)
                             is JSONObject, is JSONArray -> walk(item, depth + 1, title, nextHeaders)

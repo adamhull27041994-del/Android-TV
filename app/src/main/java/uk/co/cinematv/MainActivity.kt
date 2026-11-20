@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import uk.co.cinematv.model.*
 import uk.co.cinematv.player.PlayerActivity
+import uk.co.cinematv.provider.VoeLinks
 import uk.co.cinematv.player.WebPlayerActivity
 import uk.co.cinematv.ui.CinemaViewModel
 
@@ -112,8 +113,16 @@ private fun CinemaApp(vm: CinemaViewModel) {
         }
     }
     SourceDialogs(vm, onPlay = { stream, key ->
-        if (stream.mimeType == "text/html") WebPlayerActivity.launch(context, stream.url)
-        else PlayerActivity.launch(context, stream, key)
+        val voeUrl = VoeLinks.embedUrl(stream.url)
+        when {
+            voeUrl != null -> {
+                // VOE's own player keeps hosting controls and notices intact.
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(voeUrl))) }
+                    .onFailure { android.widget.Toast.makeText(context, "No browser available for VOE", android.widget.Toast.LENGTH_LONG).show() }
+            }
+            stream.mimeType == "text/html" -> WebPlayerActivity.launch(context, stream.url)
+            else -> PlayerActivity.launch(context, stream, key)
+        }
     })
 }
 
@@ -419,7 +428,11 @@ private fun SourceDialogs(vm: CinemaViewModel, onPlay: (PlayableStream, StreamKe
                         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(stream.title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                Text(stream.provider + if (stream.mimeType == "text/html") " · Web embed" else " · Direct stream", fontSize = 11.sp, color = Secondary)
+                                Text(stream.provider + when {
+                                    VoeLinks.embedUrl(stream.url) != null -> " · VOE (opens browser)"
+                                    stream.mimeType == "text/html" -> " · Web embed"
+                                    else -> " · Direct stream"
+                                }, fontSize = 11.sp, color = Secondary)
                             }
                             IconButton(onClick = { onPlay(stream, key) }) { Icon(Icons.Default.PlayArrow, "Play", tint = Crimson) }
                             if (stream.provider == "Personal sources") {
@@ -461,7 +474,7 @@ private fun AddSourceDialog(vm: CinemaViewModel) {
                     }
                 }
                 if (vm.sourceError != null) Text(vm.sourceError!!, color = Crimson, fontSize = 12.sp)
-                Text("Only add content you own or are authorised to stream.", color = Secondary, fontSize = 11.sp)
+                Text("Add an authorised direct video link or a VOE share/embed link. VOE opens in your browser.", color = Secondary, fontSize = 11.sp)
             }
         },
         confirmButton = {

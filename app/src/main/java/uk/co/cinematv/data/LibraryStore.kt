@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 import uk.co.cinematv.model.*
+import uk.co.cinematv.provider.VoeLinks
 
 private val Context.cinemaStore by preferencesDataStore("cinema_library")
 
@@ -35,8 +36,10 @@ class LibraryStore(private val context: Context) {
     }.filter { it.mediaKey == key.media.key && it.season == key.season && it.episode == key.episode }.map { it.stream }
 
     suspend fun addSource(key: StreamKey, title: String, url: String, mimeType: String?) {
-        require(url.startsWith("https://", true)) { "Please use a valid HTTPS video URL" }
-        val src = SavedStream(key.media.key, key.season, key.episode, PlayableStream(java.util.UUID.randomUUID().toString(), "Personal sources", title.trim().ifEmpty { "My stream" }, url.trim(), mimeType))
+        val normalized = VoeLinks.embedUrl(url) ?: url.trim()
+        require(normalized.startsWith("https://", true)) { "Please use a valid HTTPS video URL" }
+        val selectedMime = if (VoeLinks.embedUrl(url) != null) "text/html" else mimeType
+        val src = SavedStream(key.media.key, key.season, key.episode, PlayableStream(java.util.UUID.randomUUID().toString(), "Personal sources", title.trim().ifEmpty { "My stream" }, normalized, selectedMime))
         context.cinemaStore.edit { prefs ->
             val old = runCatching { JSONArray(prefs[streamsKey] ?: "[]") }.getOrDefault(JSONArray())
             old.put(src.toJson()); prefs[streamsKey] = old.toString()

@@ -95,3 +95,19 @@ Provider endpoints can break or change without warning. These providers are inde
 ## Additional source adapters (APK investigation)
 
 This revision adds YaStream, VidBolt and ThugTV direct JSON resolvers and a 2Embed HTML-player fallback. Their routes and expected output fields are reconstructed from the supplied Cinema HQ v9.1 APK, not from a documented, stable provider contract. Entries are only displayed as direct streams when an HTTPS video-looking URL is returned. Service availability, actual playback and streaming rights have not been verified. All source requests run concurrently so slow/offline services do not block other results. Providers needing decryption, dynamic player keys or debrid tokens remain unimplemented.
+
+
+## VOE video-host links
+
+Cinema HQ's supplied APK did not have plain-text VOE references in its three DEX files.
+VOE does not expose a public TMDb-to-episode streaming catalogue; the official API
+lists files belonging to the authenticated VOE account.
+
+This app supports VOE as a **hosted player link**, not an automatic TV provider.
+Users can save an authorised VOE share URL (for example,
+https://voe.sx/abc123456789) or embed URL (https://voe.sx/e/abc123456789)
+against a specific movie or episode. A supported link returned inside a provider
+JSON response is likewise recognised as a hosted link. Both cases launch the
+official VOE player in the device browser, preserving the site's normal controls.
+We do not extract VOE CDN URLs or attempt to bypass the site's advertising or
+access restrictions. This does not guarantee that a given VOE file is available.
