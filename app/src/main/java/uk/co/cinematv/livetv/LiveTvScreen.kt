@@ -27,6 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import uk.co.cinematv.model.PlayableStream
 import uk.co.cinematv.player.PlayerActivity
 
@@ -34,6 +39,8 @@ private val Bg = Color(0xFF101014)
 private val Panel = Color(0xFF1B1B23)
 private val Accent = Color(0xFFE94560)
 private val Muted = Color(0xFFA7A7B5)
+private val StreamGood = Color(0xFF78D6A1)
+private val StreamWarning = Color(0xFFEEC16A)
 
 @Composable
 fun LiveTvScreen() {
@@ -48,6 +55,13 @@ fun LiveTvScreen() {
     var search by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var autoLoading by remember { mutableStateOf(false) }
+    var checking by remember { mutableStateOf(false) }
+    var manualExpanded by remember { mutableStateOf(false) }
+    var sourceLabel by remember { mutableStateOf("") }
+    val streamStatus = remember {
+        mutableStateMapOf<String, UkChannelDiscovery.ProbeResult>()
+    }
 
     fun loadFeed(address: String) {
         if (loading) return
@@ -58,6 +72,9 @@ fun LiveTvScreen() {
                 .onSuccess { result ->
                     channels = result
                     category = "All"
+                    search = ""
+                    sourceLabel = "Your playlist"
+                    streamStatus.clear()
                     preferences.edit().putString("feed_url", address).apply()
                 }
                 .onFailure { throwable ->
@@ -66,10 +83,71 @@ fun LiveTvScreen() {
             loading = false
         }
     }
-    LaunchedEffect(Unit) {
-        val address = preferences.getString("feed_url", "").orEmpty()
-        if (address.isNotBlank()) loadFeed(address)
+    fun checkChannels(itemsToCheck: List<LiveChannel>) {
+        if (checking || itemsToCheck.isEmpty()) return
+        val chosen = itemsToCheck.distinctBy { it.url }.take(10)
+        checking = true
+        chosen.forEach { channel ->
+            streamStatus[channel.url] = UkChannelDiscovery.ProbeResult(
+                UkChannelDiscovery.ProbeStatus.CHECKING, "Checking"
+            )
+        }
+        scope.launch {
+            try {
+                val limiter = Semaphore(3)
+                coroutineScope {
+                    chosen.map { channel ->
+                        async {
+                            val result = limiter.withPermit {
+                                UkChannelDiscovery.check(channel)
+                            }
+                            streamStatus[channel.url] = result
+                        }
+                    }.awaitAll()
+                }
+            } finally {
+                checking = false
+            }
+        }
     }
+
+    fun scanUK(force: Boolean = false) {
+        if (autoLoading || loading) return
+        autoLoading = true
+        error = null
+        scope.launch {
+            try {
+                val result = UkChannelDiscovery.discover(force)
+                if (result.channels.isEmpty()) {
+                    error = result.warnings.joinToString("; ")
+                        .ifBlank { "No UK listings could be downloaded." }
+                } else {
+                    channels = result.channels
+                    category = "All"
+                    search = ""
+                    sourceLabel = "Public UK lists · " + result.sourcesLoaded + "/" +
+                        result.sourcesAttempted + " sources"
+                    streamStatus.clear()
+                    if (result.warnings.isNotEmpty()) {
+                        error = result.warnings.joinToString("; ")
+                    }
+                    val bbcOne = result.channels.filter { UkChannelDiscovery.isBbcOne(it) }
+                        .take(4)
+                    val popular = result.channels.filter {
+                        UkChannelDiscovery.priority(it.name) in 1..8
+                    }.distinctBy { UkChannelDiscovery.priority(it.name) }.take(5)
+                    checkChannels(bbcOne + popular)
+                }
+            } catch (e: Exception) {
+                error = e.message ?: "Unable to scan public UK channels."
+            } finally {
+                autoLoading = false
+            }
+        }
+    }
+
+    // Automatically show public UK channel listings without asking for a URL.
+    LaunchedEffect(Unit) { scanUK() }
 
     val groups = remember(channels) {
         listOf("All") + channels.map { it.group }.distinct().sorted()
@@ -97,6 +175,58 @@ fun LiveTvScreen() {
                 }
             }
         }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Automatic UK channel discovery",
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(
+                        "Searches IPTV-org UK and Free-TV UK for channels including BBC One. " +
+                            "Availability tests check responses only; they do not prove playback.",
+                        color = Muted, fontSize = 12.sp
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { scanUK(force = true) },
+                            enabled = !autoLoading && !loading
+                        ) {
+                            Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("Scan UK")
+                        }
+                        OutlinedButton(
+                            enabled = channels.isNotEmpty(),
+                            onClick = {
+                                category = "All"
+                                search = "BBC One"
+                                checkChannels(
+                                    channels.filter { UkChannelDiscovery.isBbcOne(it) }.take(6)
+                                )
+                            }
+                        ) { Text("BBC One") }
+                    }
+                    if (autoLoading) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = Accent)
+                        Text("Downloading public channel lists...",
+                            color = Muted, fontSize = 12.sp)
+                    } else if (sourceLabel.isNotBlank()) {
+                        Text(sourceLabel, color = Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        item {
+            TextButton(onClick = { manualExpanded = !manualExpanded }) {
+                Text(if (manualExpanded) "Hide custom playlist" else "Use my own IPTV playlist")
+            }
+        }
+        if (manualExpanded) {
         item {
             Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
                 Column(
@@ -141,6 +271,7 @@ fun LiveTvScreen() {
                 }
             }
         }
+        }
         if (error != null) {
             item { Text(error.orEmpty(), color = Accent, fontSize = 13.sp) }
         }
@@ -150,7 +281,8 @@ fun LiveTvScreen() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("${channels.size} channels", fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f))
-                    Text("Loaded", color = Muted, fontSize = 12.sp)
+                    Text(if (checking) "Checking streams..." else "Loaded",
+                        color = Muted, fontSize = 12.sp)
                 }
             }
             item {
@@ -173,7 +305,24 @@ fun LiveTvScreen() {
                     }
                 }
             }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { checkChannels(filtered.take(10)) },
+                        enabled = !checking && filtered.isNotEmpty()
+                    ) {
+                        Text(if (checking) "Checking..." else "Check first 10 streams")
+                    }
+                    Text("HTTP / manifest check only",
+                        color = Muted, fontSize = 11.sp)
+                }
+            }
             items(filtered, key = { it.name + "|" + it.url }) { item ->
+                val probe = streamStatus[item.url]
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Panel),
                     modifier = Modifier.fillMaxWidth().clickable {
@@ -218,7 +367,26 @@ fun LiveTvScreen() {
                         Column(Modifier.weight(1f)) {
                             Text(item.name, fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(item.group, color = Muted, fontSize = 11.sp)
+                            Text(item.group + " · " + item.source,
+                                color = Muted, fontSize = 11.sp, maxLines = 1)
+                            val statusLabel = when (probe?.status) {
+                                UkChannelDiscovery.ProbeStatus.CHECKING -> "Checking..."
+                                UkChannelDiscovery.ProbeStatus.RESPONDING -> probe.description
+                                UkChannelDiscovery.ProbeStatus.RESTRICTED -> probe.description
+                                UkChannelDiscovery.ProbeStatus.UNAVAILABLE -> probe.description
+                                UkChannelDiscovery.ProbeStatus.UNKNOWN -> probe.description
+                                else -> "Not tested"
+                            }
+                            val statusColor = when (probe?.status) {
+                                UkChannelDiscovery.ProbeStatus.RESPONDING -> StreamGood
+                                UkChannelDiscovery.ProbeStatus.RESTRICTED,
+                                UkChannelDiscovery.ProbeStatus.UNAVAILABLE -> Accent
+                                UkChannelDiscovery.ProbeStatus.UNKNOWN,
+                                UkChannelDiscovery.ProbeStatus.CHECKING -> StreamWarning
+                                else -> Muted
+                            }
+                            Text(statusLabel, color = statusColor,
+                                fontSize = 11.sp, maxLines = 2)
                         }
                         Icon(Icons.Default.PlayArrow, "Watch", tint = Accent)
                     }
@@ -229,8 +397,12 @@ fun LiveTvScreen() {
             }
         } else if (!loading && error == null) {
             item {
-                Text("Add a playlist URL to browse live channels.",
-                    color = Muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 24.dp))
+                Text(
+                    if (autoLoading) "Searching public UK lists..."
+                    else "No channels loaded. Select Scan UK to retry, or add your own playlist.",
+                    color = Muted, fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 24.dp)
+                )
             }
         }
     }
