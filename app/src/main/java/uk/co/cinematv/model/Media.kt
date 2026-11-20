@@ -64,7 +64,7 @@ data class PlayableStream(
     }
 }
 
-data class StreamKey(val media: MediaTitle, val season: Int? = null, val episode: Int? = null) {
+data class StreamKey(val media: MediaTitle, val season: Int? = null, val episode: Int? = null, val episodeTitle: String? = null) {
     val key get() = "${media.key}:${season ?: 0}:${episode ?: 0}"
 }
 
@@ -77,14 +77,29 @@ data class SavedStream(val mediaKey: String, val season: Int?, val episode: Int?
     }
 }
 
-data class WatchProgress(val media: MediaTitle, val season: Int?, val episode: Int?, val positionMs: Long, val durationMs: Long, val updatedAt: Long) {
-    val fraction: Float get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+data class WatchProgress(
+    val media: MediaTitle,
+    val season: Int?,
+    val episode: Int?,
+    val positionMs: Long,
+    val durationMs: Long,
+    val updatedAt: Long,
+    val episodeTitle: String? = null
+) {
+    val fraction: Float get() = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     fun toJson() = JSONObject().apply {
         put("media", media.toJson()); put("season", season); put("episode", episode)
         put("positionMs", positionMs); put("durationMs", durationMs); put("updatedAt", updatedAt)
+        if (!episodeTitle.isNullOrBlank()) put("episodeTitle", episodeTitle)
     }
     companion object {
-        fun fromJson(o: JSONObject) = WatchProgress(MediaTitle.fromJson(o.getJSONObject("media")), if (o.isNull("season")) null else o.optInt("season"), if (o.isNull("episode")) null else o.optInt("episode"), o.optLong("positionMs"), o.optLong("durationMs"), o.optLong("updatedAt"))
+        fun fromJson(o: JSONObject) = WatchProgress(
+            MediaTitle.fromJson(o.getJSONObject("media")),
+            if (o.isNull("season")) null else o.optInt("season"),
+            if (o.isNull("episode")) null else o.optInt("episode"),
+            o.optLong("positionMs"), o.optLong("durationMs"), o.optLong("updatedAt"),
+            o.optString("episodeTitle").takeIf { it.isNotBlank() && it != "null" }
+        )
     }
 }
 

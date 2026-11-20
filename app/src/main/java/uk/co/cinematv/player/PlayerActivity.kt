@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,6 +39,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import uk.co.cinematv.data.LibraryStore
@@ -56,6 +58,7 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
@@ -73,9 +76,10 @@ class PlayerActivity : ComponentActivity() {
         val tmdbId = intent.getIntExtra(EXTRA_TMDB_ID, 0)
         val season = intent.getIntExtra(EXTRA_SEASON, -1).takeIf { it >= 0 }
         val episode = intent.getIntExtra(EXTRA_EPISODE, -1).takeIf { it >= 0 }
+        val episodeTitle = intent.getStringExtra(EXTRA_EPISODE_TITLE)
         if (tmdbId > 0) {
             details = StreamKey(MediaTitle(tmdbId, kind, mediaTitle,
-                poster = intent.getStringExtra(EXTRA_POSTER)), season, episode)
+                poster = intent.getStringExtra(EXTRA_POSTER)), season, episode, episodeTitle)
         }
 
         val sourceMime = intent.getStringExtra(EXTRA_MIME)
@@ -134,6 +138,12 @@ class PlayerActivity : ComponentActivity() {
             exo.prepare()
             exo.playWhenReady = true
         }
+        lifecycleScope.launch {
+            while (isActive) {
+                delay(15_000L)
+                if (player?.isPlaying == true) saveProgress()
+            }
+        }
     }
 
     private fun saveProgress() {
@@ -143,10 +153,11 @@ class PlayerActivity : ComponentActivity() {
         if (now - previousSaveElapsed < 1500L) return
         previousSaveElapsed = now
         val pos = active.currentPosition.coerceAtLeast(0L)
+        if (pos < 3_000L) return // Do not create a watched record by opening a video.
         val duration = active.duration.takeIf { it > 0L } ?: 0L
         lifecycleScope.launch {
             store.updateProgress(WatchProgress(key.media, key.season, key.episode,
-                pos, duration, System.currentTimeMillis()))
+                pos, duration, System.currentTimeMillis(), key.episodeTitle))
         }
     }
 
@@ -164,6 +175,7 @@ class PlayerActivity : ComponentActivity() {
     override fun onDestroy() {
         player?.release()
         player = null
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         super.onDestroy()
     }
 
@@ -177,6 +189,7 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_POSTER = "media_poster"
         private const val EXTRA_SEASON = "season"
         private const val EXTRA_EPISODE = "episode"
+        private const val EXTRA_EPISODE_TITLE = "episode_title"
 
         fun launch(context: Context, stream: PlayableStream, key: StreamKey? = null) {
             val intent = Intent(context, PlayerActivity::class.java).apply {
@@ -190,6 +203,7 @@ class PlayerActivity : ComponentActivity() {
                     putExtra(EXTRA_POSTER, key.media.poster)
                     putExtra(EXTRA_SEASON, key.season ?: -1)
                     putExtra(EXTRA_EPISODE, key.episode ?: -1)
+                    putExtra(EXTRA_EPISODE_TITLE, key.episodeTitle)
                 }
             }
             context.startActivity(intent)
@@ -263,6 +277,7 @@ private fun CinemaPlayerUI(
                 factory = { context ->
                     PlayerView(context).apply {
                         this.player = player
+                        keepScreenOn = true
                         useController = false
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)

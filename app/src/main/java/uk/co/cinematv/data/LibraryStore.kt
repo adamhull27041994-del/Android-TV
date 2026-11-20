@@ -65,7 +65,10 @@ class LibraryStore(private val context: Context) {
         }
     }
 
-    suspend fun lastPosition(key: StreamKey): Long = progress().firstOrNull {
-        it.media.key == key.media.key && it.season == key.season && it.episode == key.episode
-    }?.positionMs ?: 0L
+    suspend fun lastPosition(key: StreamKey): Long {
+        val item = progress().firstOrNull {
+            it.media.key == key.media.key && it.season == key.season && it.episode == key.episode
+        } ?: return 0L
+        return if (item.durationMs > 0L && item.fraction >= 0.95f) 0L else item.positionMs
+    }
 }

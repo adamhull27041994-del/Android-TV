@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -26,6 +27,7 @@ class WebPlayerActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         val uri = Uri.parse(url)
         if (!isAllowedPlayerUrl(uri)) {
@@ -35,6 +37,7 @@ class WebPlayerActivity : ComponentActivity() {
         }
         root = FrameLayout(this)
         val w = WebView(this).apply {
+            keepScreenOn = true
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false
@@ -84,6 +87,7 @@ class WebPlayerActivity : ComponentActivity() {
             it.destroy()
         }
         web = null
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         super.onDestroy()
     }
 
