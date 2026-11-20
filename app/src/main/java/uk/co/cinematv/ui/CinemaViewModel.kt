@@ -18,11 +18,15 @@ import uk.co.cinematv.provider.PersonalStreamProvider
 import uk.co.cinematv.provider.ProviderRegistry
 import uk.co.cinematv.provider.WatchOutProvider
 import uk.co.cinematv.provider.VidLinkEmbedProvider
+import uk.co.cinematv.provider.YaStreamProvider
+import uk.co.cinematv.provider.VidBoltProvider
+import uk.co.cinematv.provider.ThugTvProvider
+import uk.co.cinematv.provider.TwoEmbedWebProvider
 
 class CinemaViewModel(app: Application) : AndroidViewModel(app) {
     private val api = TmdbApi()
     private val store = LibraryStore(app)
-    private val providerRegistry = ProviderRegistry(listOf(PersonalStreamProvider(store), WatchOutProvider(), VidLinkEmbedProvider()))
+    private val providerRegistry = ProviderRegistry(listOf(PersonalStreamProvider(store), WatchOutProvider(), YaStreamProvider(), VidBoltProvider(), ThugTvProvider(), VidLinkEmbedProvider(), TwoEmbedWebProvider()))
 
     var tab by mutableStateOf(0)
     var homeLoading by mutableStateOf(true)

@@ -90,3 +90,8 @@ This product uses the TMDb API but is not endorsed or certified by TMDb. TMDb da
 - **Personal sources**: Explicitly added streams remain available and deletable as before.
 
 Provider endpoints can break or change without warning. These providers are independent of this project and do not certify any licensing or right to view content. The original APK contains many other providers whose request protocols or responses have not yet been implemented.
+
+
+## Additional source adapters (APK investigation)
+
+This revision adds YaStream, VidBolt and ThugTV direct JSON resolvers and a 2Embed HTML-player fallback. Their routes and expected output fields are reconstructed from the supplied Cinema HQ v9.1 APK, not from a documented, stable provider contract. Entries are only displayed as direct streams when an HTTPS video-looking URL is returned. Service availability, actual playback and streaming rights have not been verified. All source requests run concurrently so slow/offline services do not block other results. Providers needing decryption, dynamic player keys or debrid tokens remain unimplemented.

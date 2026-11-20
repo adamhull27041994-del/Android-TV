@@ -110,9 +110,23 @@ class VidLinkEmbedProvider : StreamProvider {
     }
 }
 
-/** A bad or unavailable provider must not prevent other providers returning sources. */
+/** Concurrent resolution prevents one unavailable API from stalling the source list. */
 class ProviderRegistry(private val providers: List<StreamProvider>) {
-    suspend fun resolve(key: StreamKey): List<PlayableStream> = providers.flatMap { provider ->
-        runCatching { provider.resolve(key) }.getOrDefault(emptyList())
-    }.distinctBy { it.url }
+    suspend fun resolve(key: StreamKey): List<PlayableStream> = kotlinx.coroutines.supervisorScope {
+        providers.map { provider ->
+            kotlinx.coroutines.async(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    kotlinx.coroutines.withTimeoutOrNull(14_000L) { provider.resolve(key) }.orEmpty()
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+        }.let { tasks ->
+            kotlinx.coroutines.awaitAll(*tasks.toTypedArray()).flatten()
+                .distinctBy { it.url }
+                .sortedWith(compareBy<PlayableStream> { it.mimeType == "text/html" }.thenBy { it.provider })
+        }
+    }
 }

@@ -28,7 +28,7 @@ class WebPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         val uri = Uri.parse(url)
-        if (uri.scheme != "https" || uri.host != "vidlink.pro" || !isValidPath(uri.path.orEmpty())) {
+        if (!isAllowedPlayerUrl(uri)) {
             Toast.makeText(this, "Unsupported web player URL", Toast.LENGTH_LONG).show()
             finish()
             return
@@ -48,7 +48,7 @@ class WebPlayerActivity : ComponentActivity() {
                     // to advertisements, unrelated websites or non-HTTPS schemes.
                     if (!request.isForMainFrame) return false
                     val next = request.url
-                    return next.scheme != "https" || next.host != "vidlink.pro"
+                    return !isAllowedPlayerHost(next)
                 }
             }
             webChromeClient = object : WebChromeClient() {
@@ -89,8 +89,18 @@ class WebPlayerActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_URL = "embed_url"
-        private fun isValidPath(path: String): Boolean =
-            Regex("^/(movie/[0-9]+|tv/[0-9]+/[0-9]+/[0-9]+)$").matches(path)
+        private fun isAllowedPlayerHost(uri: Uri): Boolean =
+            uri.scheme == "https" && (uri.host == "vidlink.pro" || uri.host == "www.2embed.cc")
+
+        private fun isAllowedPlayerUrl(uri: Uri): Boolean {
+            if (!isAllowedPlayerHost(uri)) return false
+            val path = uri.path.orEmpty()
+            return if (uri.host == "vidlink.pro") {
+                Regex("^/(movie/[0-9]+|tv/[0-9]+/[0-9]+/[0-9]+)$").matches(path)
+            } else {
+                Regex("^/embed/(movie/[0-9]+|tv/[0-9]+/[0-9]+/[0-9]+)$").matches(path)
+            }
+        }
 
         fun launch(context: Context, url: String) {
             context.startActivity(Intent(context, WebPlayerActivity::class.java).putExtra(EXTRA_URL, url))
