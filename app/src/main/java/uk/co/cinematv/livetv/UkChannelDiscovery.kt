@@ -75,6 +75,7 @@ object UkChannelDiscovery {
         RESPONDING,
         RESTRICTED,
         UNAVAILABLE,
+        MISMATCH,
         UNKNOWN
     }
 
@@ -176,7 +177,8 @@ object UkChannelDiscovery {
         return all.copy(
             channels = all.channels.filter { matchesChannelName(it.name, query) }
                 .sortedWith(
-                    compareBy<LiveChannel> { priority(it.name) }
+                    compareBy<LiveChannel> { if (skySportsLabelMismatch(it) == null) 0 else 1 }
+                        .thenBy { priority(it.name) }
                         .thenBy { it.name.lowercase() }
                         .thenBy { it.source }
                 )
@@ -222,12 +224,63 @@ object UkChannelDiscovery {
     }
 
     /**
+     * Some unofficial IPTV entries have misleading names. For example, a
+     * channel listed as Sky Sports News currently points to an HLS path
+     * explicitly labelled SKY_SPORTS_PREMIER_LEAGUE. Do not claim it is News,
+     * or mark it working, even if the HTTP manifest responds.
+     *
+     * This only flags clear, contradictory Sky-channel labels in URLs. An
+     * unrecognisable URL remains unverified; it is not evidence of a match.
+     */
+    fun skySportsLabelMismatch(channel: LiveChannel): String? {
+        val labelled = channel.name.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
+        if (!labelled.startsWith("sky sports ")) return null
+        val expected = when {
+            "main event" in labelled -> "Main Event"
+            "premier league" in labelled -> "Premier League"
+            Regex("""\bfootball\b""").containsMatchIn(labelled) -> "Football"
+            Regex("""\bcricket\b""").containsMatchIn(labelled) -> "Cricket"
+            Regex("""\bgolf\b""").containsMatchIn(labelled) -> "Golf"
+            Regex("""\bf1\b""").containsMatchIn(labelled) -> "F1"
+            Regex("""\btennis\b""").containsMatchIn(labelled) -> "Tennis"
+            Regex("""\baction\b""").containsMatchIn(labelled) -> "Action"
+            Regex("""\bracing\b""").containsMatchIn(labelled) -> "Racing"
+            Regex("""\bnews\b""").containsMatchIn(labelled) -> "News"
+            Regex("""\bmix\b""").containsMatchIn(labelled) -> "Mix"
+            Regex("""\bnfl\b""").containsMatchIn(labelled) -> "NFL"
+            else -> null
+        } ?: return null
+        val path = Uri.parse(channel.url).path.orEmpty().uppercase()
+            .replace('-', '_').replace(' ', '_')
+        val actual = when {
+            "SKY_SPORTS_MAIN_EVENT" in path -> "Main Event"
+            "SKY_SPORTS_PREMIER_LEAGUE" in path -> "Premier League"
+            "SKY_SPORTS_FOOTBALL" in path -> "Football"
+            "SKY_SPORTS_CRICKET" in path -> "Cricket"
+            "SKY_SPORTS_GOLF" in path -> "Golf"
+            "SKY_SPORTS_F1" in path -> "F1"
+            "SKY_SPORTS_TENNIS" in path -> "Tennis"
+            "SKY_SPORTS_ACTION" in path -> "Action"
+            "SKY_SPORTS_RACING" in path -> "Racing"
+            "SKY_SPORTS_NEWS" in path -> "News"
+            "SKY_SPORTS_MIX" in path -> "Mix"
+            "SKY_SPORTS_NFL" in path -> "NFL"
+            else -> null
+        } ?: return null
+        return if (expected == actual) null
+        else "Label mismatch: $expected listing links to $actual"
+    }
+
+    /**
      * Small, non-invasive HTTP probe. It reads at most 8 KB of the response,
      * checks HLS/DASH manifest signatures, and never downloads full videos.
      * RESPONDING means that a manifest responded, not that viewing is licensed,
      * geo-unblocked or guaranteed to play.
      */
     suspend fun check(channel: LiveChannel): ProbeResult = withContext(Dispatchers.IO) {
+        skySportsLabelMismatch(channel)?.let {
+            return@withContext ProbeResult(ProbeStatus.MISMATCH, it)
+        }
         val url = channel.url
         val parsed = Uri.parse(url)
         if (parsed.scheme != "https" || parsed.host.isNullOrBlank()) {
