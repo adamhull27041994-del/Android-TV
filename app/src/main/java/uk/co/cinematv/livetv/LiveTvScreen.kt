@@ -13,6 +13,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.AlertTriangle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,6 +53,15 @@ fun LiveTvScreen() {
         context.getSharedPreferences("cinema_live_tv", Context.MODE_PRIVATE)
     }
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = context as? LifecycleOwner
+    var playbackRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) playbackRevision += 1
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
     var feedUrl by remember { mutableStateOf(preferences.getString("feed_url", "").orEmpty()) }
     var channels by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
     var category by remember { mutableStateOf("All") }
@@ -217,6 +230,12 @@ fun LiveTvScreen() {
                         fontSize = 12.sp, color = Muted)
                 }
             }
+        }
+        item {
+            SkySportsGuide(onFindChannel = { station ->
+                scraperQuery = station
+                scrapePlaylists(station)
+            })
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
@@ -411,10 +430,18 @@ fun LiveTvScreen() {
                 }
             }
             items(filtered, key = { it.name + "|" + it.url }) { item ->
-                val probe = streamStatus[item.url]
+                val mismatch = UkChannelDiscovery.skySportsLabelMismatch(item)
+                val probe = if (mismatch != null) {
+                    UkChannelDiscovery.ProbeResult(
+                        UkChannelDiscovery.ProbeStatus.MISMATCH, mismatch
+                    )
+                } else streamStatus[item.url]
+                val videoPlayed = remember(item.url, playbackRevision) {
+                    LivePlaybackEvidence.lastVideoFrame(context, item.url) > 0L
+                }
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Panel),
-                    modifier = Modifier.fillMaxWidth().clickable {
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = mismatch == null) {
                         val parsed = Uri.parse(item.url)
                         val filename = parsed.path.orEmpty().lowercase()
                         val mime = when {
@@ -458,26 +485,41 @@ fun LiveTvScreen() {
                                 fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Text(item.group + " · " + item.source,
                                 color = Muted, fontSize = 11.sp, maxLines = 1)
-                            val statusLabel = when (probe?.status) {
-                                UkChannelDiscovery.ProbeStatus.CHECKING -> "Checking..."
-                                UkChannelDiscovery.ProbeStatus.RESPONDING -> probe.description
-                                UkChannelDiscovery.ProbeStatus.RESTRICTED -> probe.description
-                                UkChannelDiscovery.ProbeStatus.UNAVAILABLE -> probe.description
-                                UkChannelDiscovery.ProbeStatus.UNKNOWN -> probe.description
+                            val statusLabel = when {
+                                probe?.status == UkChannelDiscovery.ProbeStatus.MISMATCH ->
+                                    probe.description
+                                videoPlayed -> "Video played on this device"
+                                probe?.status == UkChannelDiscovery.ProbeStatus.CHECKING ->
+                                    "Checking..."
+                                probe?.status == UkChannelDiscovery.ProbeStatus.RESPONDING ->
+                                    probe.description + " · playback not confirmed"
+                                probe?.status == UkChannelDiscovery.ProbeStatus.RESTRICTED ->
+                                    probe.description
+                                probe?.status == UkChannelDiscovery.ProbeStatus.UNAVAILABLE ->
+                                    probe.description
+                                probe?.status == UkChannelDiscovery.ProbeStatus.UNKNOWN ->
+                                    probe.description
                                 else -> "Not tested"
                             }
-                            val statusColor = when (probe?.status) {
-                                UkChannelDiscovery.ProbeStatus.RESPONDING -> StreamGood
-                                UkChannelDiscovery.ProbeStatus.RESTRICTED,
-                                UkChannelDiscovery.ProbeStatus.UNAVAILABLE -> Accent
-                                UkChannelDiscovery.ProbeStatus.UNKNOWN,
-                                UkChannelDiscovery.ProbeStatus.CHECKING -> StreamWarning
+                            val statusColor = when {
+                                probe?.status == UkChannelDiscovery.ProbeStatus.MISMATCH -> Accent
+                                videoPlayed -> StreamGood
+                                probe?.status == UkChannelDiscovery.ProbeStatus.RESTRICTED ||
+                                    probe?.status == UkChannelDiscovery.ProbeStatus.UNAVAILABLE ->
+                                        Accent
+                                probe?.status == UkChannelDiscovery.ProbeStatus.RESPONDING ||
+                                    probe?.status == UkChannelDiscovery.ProbeStatus.CHECKING ->
+                                        StreamWarning
                                 else -> Muted
                             }
                             Text(statusLabel, color = statusColor,
                                 fontSize = 11.sp, maxLines = 2)
                         }
-                        Icon(Icons.Default.PlayArrow, "Watch", tint = Accent)
+                        if (mismatch != null) {
+                            Icon(Icons.Default.AlertTriangle, "Mislabeled source", tint = Accent)
+                        } else {
+                            Icon(Icons.Default.PlayArrow, "Watch", tint = Accent)
+                        }
                     }
                 }
             }
