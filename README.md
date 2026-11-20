@@ -111,3 +111,8 @@ JSON response is likewise recognised as a hosted link. Both cases launch the
 official VOE player in the device browser, preserving the site's normal controls.
 We do not extract VOE CDN URLs or attempt to bypass the site's advertising or
 access restrictions. This does not guarantee that a given VOE file is available.
+
+
+## Screen-awake playback and History tab
+
+The native Cinema TV player and the in-app web player request Android's `FLAG_KEEP_SCREEN_ON` while open, preventing normal inactivity dimming and locking. The flag is cleared on exit. A new **History** bottom tab uses on-device DataStore records to show individual movies and TV episodes with series name, season/episode number, optional episode title, last watched date, playback percentage, and resume/watch-again. Progress is periodically saved during native playback. Previous history stays compatible. Web-only embeds generally cannot expose reliable watch position to the app and therefore do not create native watch records.

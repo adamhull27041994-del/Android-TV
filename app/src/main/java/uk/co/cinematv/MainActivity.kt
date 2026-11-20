@@ -35,6 +35,7 @@ import uk.co.cinematv.player.PlayerActivity
 import uk.co.cinematv.provider.VoeLinks
 import uk.co.cinematv.player.WebPlayerActivity
 import uk.co.cinematv.ui.CinemaViewModel
+import uk.co.cinematv.ui.HistoryScreen
 
 private val Background = Color(0xFF101014)
 private val Surface = Color(0xFF1B1B23)
@@ -85,8 +86,8 @@ private fun CinemaApp(vm: CinemaViewModel) {
         bottomBar = {
             if (vm.selected == null) {
                 NavigationBar(containerColor = Surface) {
-                    val labels = listOf("Shows", "Movies", "Search", "My List", "Settings")
-                    val icons = listOf(Icons.Default.Tv, Icons.Default.Movie, Icons.Default.Search, Icons.Default.Bookmark, Icons.Default.Settings)
+                    val labels = listOf("Shows", "Movies", "Search", "My List", "History", "Settings")
+                    val icons = listOf(Icons.Default.Tv, Icons.Default.Movie, Icons.Default.Search, Icons.Default.Bookmark, Icons.Default.History, Icons.Default.Settings)
                     labels.forEachIndexed { index, label ->
                         NavigationBarItem(
                             selected = vm.tab == index,
@@ -108,6 +109,7 @@ private fun CinemaApp(vm: CinemaViewModel) {
                 vm.tab == 1 -> MoviesHome(vm)
                 vm.tab == 2 -> SearchScreen(vm)
                 vm.tab == 3 -> LibraryScreen(vm)
+                vm.tab == 4 -> HistoryScreen(vm)
                 else -> SettingsScreen()
             }
         }
@@ -283,10 +285,6 @@ private fun LibraryScreen(vm: CinemaViewModel) {
         item { Text("My List", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black) }
         if (vm.favourites.isEmpty()) item { EmptyMessage("No favourites saved yet. Open a movie or series and tap the bookmark icon.") }
         items(vm.favourites, key = { it.key }) { MediaListItem(it, vm::open) }
-        if (vm.history.isNotEmpty()) {
-            item { Spacer(Modifier.height(12.dp)); Text("Recently watched", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-            items(vm.history.take(15), key = { "history:${it.media.key}:${it.season}:${it.episode}" }) { MediaListItem(it.media, vm::open) }
-        }
     }
 }
 
@@ -334,7 +332,7 @@ private fun DetailsScreen(vm: CinemaViewModel, media: MediaTitle) {
             if (vm.episodesLoading) item { LoadingIndicator() }
             if (vm.episodes.isEmpty() && !vm.episodesLoading) item { EmptyMessage("No episodes found for this season.") }
             items(vm.episodes, key = { it.number }) { ep ->
-                EpisodeRow(ep, onClick = { vm.openSources(StreamKey(details.media, vm.season, ep.number)) })
+                EpisodeRow(ep, onClick = { vm.openSources(StreamKey(details.media, vm.season, ep.number, ep.title)) })
             }
         }
         item {
