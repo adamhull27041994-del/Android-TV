@@ -414,6 +414,7 @@ private fun SettingsScreen() {
 @Composable
 private fun SourceDialogs(vm: CinemaViewModel, onPlay: (PlayableStream, StreamKey) -> Unit) {
     val key = vm.sourceKey ?: return
+    var expanded by remember(key.key) { mutableStateOf(false) }
     val heading = if (key.season != null) "${key.media.title} · S${key.season} E${key.episode}" else key.media.title
     AlertDialog(
         onDismissRequest = { vm.sourceKey = null; vm.addSourceOpen = false },
@@ -422,6 +423,25 @@ private fun SourceDialogs(vm: CinemaViewModel, onPlay: (PlayableStream, StreamKe
             Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(heading, fontWeight = FontWeight.Bold)
                 if (vm.sourcesLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (vm.providerReports.isNotEmpty()) {
+                    val reports = vm.providerReports
+                    val connected = reports.count { it.status != "Not integrated" && it.name != "Personal sources" }
+                    val remaining = reports.count { it.status == "Not integrated" }
+                    Text("40 Cinema HQ providers: $connected configured, $remaining not integrated.",
+                        color = Secondary, fontSize = 12.sp)
+                    TextButton(onClick = { expanded = !expanded }) {
+                        Icon(Icons.Default.List, null)
+                        Spacer(Modifier.width(5.dp))
+                        Text(if (expanded) "Hide provider status" else "Show all 40 provider statuses")
+                    }
+                    if (expanded) reports.forEach { report ->
+                        Text(report.name + " — " + report.status,
+                            fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            color = if (report.status == "Links returned") Color(0xFF74C69D) else Secondary)
+                        Text(report.detail, fontSize = 11.sp, color = Secondary)
+                        HorizontalDivider(color = Color(0xFF383842))
+                    }
+                }
                 if (vm.sourceResults.isEmpty() && !vm.sourcesLoading) Text("No direct stream found for this title or episode. The web player may still be able to find one.", color = Secondary, fontSize = 13.sp)
                 vm.sourceResults.forEach { stream ->
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF272732))) {

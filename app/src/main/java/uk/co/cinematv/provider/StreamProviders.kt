@@ -115,23 +115,43 @@ class VidLinkEmbedProvider : StreamProvider {
     }
 }
 
-/** Concurrent resolution prevents one unavailable API from stalling the source list. */
+/** Each APK provider has a visible diagnostic status; names without an adapter are not queried. */
 class ProviderRegistry(private val providers: List<StreamProvider>) {
-    suspend fun resolve(key: StreamKey): List<PlayableStream> = supervisorScope {
-        providers.map { provider ->
+    suspend fun scan(key: StreamKey): SourceScan = supervisorScope {
+        val batches = providers.map { provider ->
             async(Dispatchers.IO) {
                 try {
-                    kotlinx.coroutines.withTimeoutOrNull(14_000L) { provider.resolve(key) }.orEmpty()
-                } catch (error: kotlinx.coroutines.CancellationException) {
-                    throw error
-                } catch (_: Exception) {
-                    emptyList()
+                    val links = withTimeoutOrNull(13_500L) { provider.resolve(key) }
+                    val report = when {
+                        links == null -> ProviderReport(provider.name,"Timeout","Provider did not respond")
+                        links.isEmpty() -> ProviderReport(provider.name,"No links","No directly playable URL returned")
+                        links.all { it.mimeType == "text/html" } ->
+                            ProviderReport(provider.name,"Web option","Unverified browser player, not a direct video",links.size)
+                        else -> ProviderReport(provider.name,"Links returned","Playback is not yet verified",links.size)
+                    }
+                    links.orEmpty() to report
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (error: Exception) {
+                    emptyList<PlayableStream>() to ProviderReport(provider.name,"Request failed",error.message?.take(100) ?: "Network or parser error")
                 }
             }
-        }.let { tasks ->
-            tasks.awaitAll().flatten()
-                .distinctBy { it.url }
-                .sortedWith(compareBy<PlayableStream> { it.mimeType == "text/html" }.thenBy { it.provider })
-        }
+        }.awaitAll()
+        val sources = batches.flatMap { it.first }.distinctBy { it.url }
+            .sortedWith(compareBy<PlayableStream> { it.mimeType == "text/html" }.thenBy { it.provider })
+        val reported = batches.map { it.second }
+        val inventory = ApkProviderCatalog.names.map { name ->
+            val matched = reported.filter { ApkProviderCatalog.canonical(it.name) == name }
+            if (matched.isEmpty()) ProviderReport(name,"Not integrated",ApkProviderCatalog.unavailableReason(name))
+            else {
+                val best = matched.firstOrNull { it.status == "Links returned" }
+                    ?: matched.firstOrNull { it.status == "Web option" }
+                    ?: matched.firstOrNull { it.status == "No links" }
+                    ?: matched.first()
+                best.copy(name=name,count=matched.sumOf { it.count })
+            }
+        } + reported.filter { ApkProviderCatalog.canonical(it.name) !in ApkProviderCatalog.names }
+        SourceScan(sources,inventory)
     }
+    suspend fun resolve(key: StreamKey): List<PlayableStream> = scan(key).streams
 }

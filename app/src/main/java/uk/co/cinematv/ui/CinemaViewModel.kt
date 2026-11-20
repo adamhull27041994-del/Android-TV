@@ -16,6 +16,7 @@ import uk.co.cinematv.data.TmdbApi
 import uk.co.cinematv.model.*
 import uk.co.cinematv.provider.PersonalStreamProvider
 import uk.co.cinematv.provider.ProviderRegistry
+import uk.co.cinematv.provider.ProviderReport
 import uk.co.cinematv.provider.WatchOutProvider
 import uk.co.cinematv.provider.VidLinkEmbedProvider
 import uk.co.cinematv.provider.YaStreamProvider
@@ -53,6 +54,7 @@ class CinemaViewModel(app: Application) : AndroidViewModel(app) {
 
     var sourceKey by mutableStateOf<StreamKey?>(null)
     var sourceResults by mutableStateOf<List<PlayableStream>>(emptyList())
+    var providerReports by mutableStateOf<List<ProviderReport>>(emptyList())
     var sourcesLoading by mutableStateOf(false)
     var addSourceOpen by mutableStateOf(false)
     var sourceError by mutableStateOf<String?>(null)
@@ -140,7 +142,7 @@ class CinemaViewModel(app: Application) : AndroidViewModel(app) {
     fun isFavourite(media: MediaTitle) = favourites.any { it.key == media.key }
 
     fun openSources(key: StreamKey) {
-        sourceKey = key; sourceResults = emptyList(); sourceError = null; addSourceOpen = false
+        sourceKey = key; sourceResults = emptyList(); providerReports = emptyList(); sourceError = null; addSourceOpen = false
         loadSources()
     }
 
@@ -148,8 +150,10 @@ class CinemaViewModel(app: Application) : AndroidViewModel(app) {
         val key = sourceKey ?: return
         viewModelScope.launch {
             sourcesLoading = true
-            val result = runCatching { providerRegistry.resolve(key) }
-            result.onSuccess { sourceResults = it }.onFailure { sourceError = it.message }
+            val result = runCatching { providerRegistry.scan(key) }
+            result.onSuccess {
+                if (sourceKey == key) { sourceResults = it.streams; providerReports = it.reports }
+            }.onFailure { sourceError = it.message }
             sourcesLoading = false
         }
     }
