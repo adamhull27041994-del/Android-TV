@@ -23,11 +23,12 @@ class WebPlayerActivity : ComponentActivity() {
     private lateinit var root: FrameLayout
     private var fullscreen: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private val screenAwake by lazy { PlaybackScreenAwake(this) }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        screenAwake.activate()
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         val uri = Uri.parse(url)
         if (!isAllowedPlayerUrl(uri)) {
@@ -35,7 +36,7 @@ class WebPlayerActivity : ComponentActivity() {
             finish()
             return
         }
-        root = FrameLayout(this)
+        root = FrameLayout(this).apply { keepScreenOn = true }
         val w = WebView(this).apply {
             keepScreenOn = true
             settings.javaScriptEnabled = true
@@ -59,6 +60,9 @@ class WebPlayerActivity : ComponentActivity() {
                     if (fullscreen != null) { callback.onCustomViewHidden(); return }
                     fullscreen = view
                     fullscreenCallback = callback
+                    view.keepScreenOn = true
+                    root.keepScreenOn = true
+                    screenAwake.activate()
                     root.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                     this@WebPlayerActivity.web?.visibility = View.GONE
                 }
@@ -77,8 +81,22 @@ class WebPlayerActivity : ComponentActivity() {
         setContentView(root)
     }
 
+    override fun onResume() {
+        super.onResume()
+        screenAwake.activate()
+    }
+
+    override fun onPause() {
+        screenAwake.deactivate()
+        super.onPause()
+    }
+
     override fun onDestroy() {
-        if (!::root.isInitialized) { super.onDestroy(); return }
+        if (!::root.isInitialized) {
+            screenAwake.deactivate()
+            super.onDestroy()
+            return
+        }
         fullscreen?.let { root.removeView(it) }
         web?.let {
             root.removeView(it)
@@ -87,7 +105,7 @@ class WebPlayerActivity : ComponentActivity() {
             it.destroy()
         }
         web = null
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        screenAwake.deactivate()
         super.onDestroy()
     }
 

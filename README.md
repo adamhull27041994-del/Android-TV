@@ -116,3 +116,23 @@ access restrictions. This does not guarantee that a given VOE file is available.
 ## Screen-awake playback and History tab
 
 The native Cinema TV player and the in-app web player request Android's `FLAG_KEEP_SCREEN_ON` while open, preventing normal inactivity dimming and locking. The flag is cleared on exit. A new **History** bottom tab uses on-device DataStore records to show individual movies and TV episodes with series name, season/episode number, optional episode title, last watched date, playback percentage, and resume/watch-again. Progress is periodically saved during native playback. Previous history stays compatible. Web-only embeds generally cannot expose reliable watch position to the app and therefore do not create native watch records.
+
+
+## November 20 2026 — screen-awake compatibility update
+
+The custom Media3 player and the in-app HTML player now keep their **foreground
+window**, Compose root, video surface and fullscreen web video view awake.
+An additional `SCREEN_BRIGHT_WAKE_LOCK` compatibility fallback is acquired
+only while the playback Activity is resumed, with a four-hour fail-safe timeout.
+It is released on pause, navigation away and destruction; the device can still
+be locked manually. Android explicitly recommends the window flag, which is
+still used, but a legacy wake lock can help on some devices and multi-display
+setups. The fallback requires the normal `WAKE_LOCK` permission.
+
+To confirm native player behaviour, open **Settings → Test video player**
+inside Cinema TV and allow the phone's normal timeout interval to pass.
+For a WebView embed, test an in-app VidLink or 2Embed entry separately.
+VOE and RiveStream open *external apps/browsers*; Cinema TV cannot control
+the wake state of those windows, Android Auto host displays or hardware
+screen-lock policies. A persistent timeout inside native playback can be
+diagnosed with `adb logcat -s CinemaTV_Screen:D`.

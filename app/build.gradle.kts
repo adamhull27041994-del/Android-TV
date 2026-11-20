@@ -20,8 +20,8 @@ android {
         applicationId = "uk.co.cinematv"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
         buildConfigField("String", "TMDB_BEARER", escapeBuildConfig(tmdbProperties.getProperty("TMDB_BEARER", "")))
         buildConfigField("String", "TMDB_API_KEY", escapeBuildConfig(tmdbProperties.getProperty("TMDB_API_KEY", "")))
     }

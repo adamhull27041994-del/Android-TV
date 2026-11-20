@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -55,10 +57,11 @@ class PlayerActivity : ComponentActivity() {
     private var previousSaveElapsed = 0L
     private val errorState = mutableStateOf<String?>(null)
     private val store by lazy { LibraryStore(applicationContext) }
+    private val screenAwake by lazy { PlaybackScreenAwake(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        screenAwake.activate()
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
@@ -161,9 +164,15 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        screenAwake.activate()
+    }
+
     override fun onPause() {
         saveProgress()
         player?.pause()
+        screenAwake.deactivate()
         super.onPause()
     }
 
@@ -175,7 +184,7 @@ class PlayerActivity : ComponentActivity() {
     override fun onDestroy() {
         player?.release()
         player = null
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        screenAwake.deactivate()
         super.onDestroy()
     }
 
@@ -235,6 +244,14 @@ private fun CinemaPlayerUI(
     onClose: () -> Unit,
     onRetry: () -> Unit
 ) {
+    // The Compose overlay is a separate view hierarchy from PlayerView.
+    // Keep that root awake too, while this composable is visible.
+    val composeRoot = LocalView.current
+    DisposableEffect(composeRoot) {
+        val previous = composeRoot.keepScreenOn
+        composeRoot.keepScreenOn = true
+        onDispose { composeRoot.keepScreenOn = previous }
+    }
     var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(false) }
     var buffering by remember { mutableStateOf(false) }
